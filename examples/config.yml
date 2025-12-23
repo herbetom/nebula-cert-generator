@@ -1,0 +1,37 @@
+defaults:
+  #duration: 8760h
+  #ca_crt: "ca.crt"
+  #ca_key: "ca.key"
+  #out_crt: "hosts/{{name}}.crt"
+  #out_key: "hosts/{{name}}.key"
+  #cmd_post: "cat hosts/{{name}}.key | agenix -e hosts/{{name}}.key.age; rm hosts/{{name}}.key"
+
+clients:
+  - name: lighthouse01
+    networks:
+      - 192.0.2.1/24
+      - 2001:db8::1/64
+    groups:
+      - lighthouse
+  - name: lighthouse02
+    networks:
+      - 192.0.2.2/24
+      - 2001:db8::2/64
+    groups:
+      - lighthouse
+  - name: gw01
+    networks:
+      - 192.0.2.11/24
+      - 2001:db8::11/64
+    groups:
+      - server
+      - gw
+    cmd_post: "echo hallo"
+  - name: gw02
+    networks:
+      - 192.0.2.12/24
+      - 2001:db8::12/64
+    groups:
+      - server
+      - gw
+    cmd_post: "echo hallo"

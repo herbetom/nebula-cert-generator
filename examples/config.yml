@@ -1,10 +1,14 @@
+global:
+  cmd_pre: "echo \"before cmd\""
+  #cmd_post: "echo hallo2"
+
 defaults:
   #duration: 8760h
   #ca_crt: "ca.crt"
   #ca_key: "ca.key"
   #out_crt: "hosts/{{name}}.crt"
   #out_key: "hosts/{{name}}.key"
-  #cmd_post: "cat hosts/{{name}}.key | agenix -e hosts/{{name}}.key.age; rm hosts/{{name}}.key"
+  #sign_cmd_post: "cat hosts/{{name}}.key | agenix -e hosts/{{name}}.key.age; rm hosts/{{name}}.key"
 
 clients:
   - name: lighthouse01
@@ -26,7 +30,7 @@ clients:
     groups:
       - server
       - gw
-    cmd_post: "echo hallo"
+    sign_cmd_post: "echo hallo"
   - name: gw02
     networks:
       - 192.0.2.12/24
@@ -34,4 +38,3 @@ clients:
     groups:
       - server
       - gw
-    cmd_post: "echo hallo"

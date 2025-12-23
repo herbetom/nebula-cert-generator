@@ -15,31 +15,36 @@ import (
 
 type Config struct {
 	Defaults Defaults `yaml:"defaults"`
+	Global   Global   `yaml:"global"`
 	Clients  []Client `yaml:"clients"`
 }
 
 type Defaults struct {
-	Duration string `yaml:"duration"`
-	Version  int    `yaml:"version"`
-	CaCrt    string `yaml:"ca_crt"`
-	CaKey    string `yaml:"ca_key"`
-	OutCrt   string `yaml:"out_crt"`
-	OutKey   string `yaml:"out_key"`
-	CmdPost  string `yaml:"cmd_post"`
+	Duration    string `yaml:"duration"`
+	Version     int    `yaml:"version"`
+	CaCrt       string `yaml:"ca_crt"`
+	CaKey       string `yaml:"ca_key"`
+	OutCrt      string `yaml:"out_crt"`
+	OutKey      string `yaml:"out_key"`
+	SignCmdPost string `yaml:"sign_cmd_post"`
+}
+type Global struct {
+	CmdPre  string `yaml:"cmd_pre"`
+	CmdPost string `yaml:"cmd_post"`
 }
 
 type Client struct {
-	Name     string   `yaml:"name"`
-	IP       string   `yaml:"ip"`
-	Networks []string `yaml:"networks"`
-	Groups   []string `yaml:"groups"`
-	Duration string   `yaml:"duration"`
-	Version  int      `yaml:"version"`
-	CaCrt    string   `yaml:"ca_crt"`
-	CaKey    string   `yaml:"ca_key"`
-	OutCrt   string   `yaml:"out_crt"`
-	OutKey   string   `yaml:"out_key"`
-	CmdPost  string   `yaml:"cmd_post"`
+	Name        string   `yaml:"name"`
+	IP          string   `yaml:"ip"`
+	Networks    []string `yaml:"networks"`
+	Groups      []string `yaml:"groups"`
+	Duration    string   `yaml:"duration"`
+	Version     int      `yaml:"version"`
+	CaCrt       string   `yaml:"ca_crt"`
+	CaKey       string   `yaml:"ca_key"`
+	OutCrt      string   `yaml:"out_crt"`
+	OutKey      string   `yaml:"out_key"`
+	SignCmdPost string   `yaml:"sign_cmd_post"`
 }
 
 func fileExists(path string) (bool, error) {
@@ -61,7 +66,7 @@ func fileRemove(path string) error {
 	return err
 }
 
-func runPostCreate(cmdStr string) error {
+func runCommand(cmdStr string) error {
 	cmd := exec.Command("sh", "-c", cmdStr)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -123,6 +128,20 @@ func main() {
 
 	if cfg.Defaults.OutKey == "" {
 		cfg.Defaults.OutKey = "hosts/{{name}}.key"
+	}
+
+	placeholders := map[string]string{
+		"ca_crt": cfg.Defaults.CaCrt,
+		"ca_key": cfg.Defaults.CaKey,
+	}
+
+	if cfg.Global.CmdPre != "" {
+		cmdPre := applyPlaceholders(cfg.Global.CmdPre, placeholders)
+
+		//log.Printf("Running cmd_pre: %s", cmdPre)
+		if err := runCommand(cmdPre); err != nil {
+			log.Fatalf("cmd_pre failed %v", err)
+		}
 	}
 
 	for _, c := range cfg.Clients {
@@ -214,19 +233,27 @@ func main() {
 			log.Fatalf("failed to generate cert for %s: %v", c.Name, err)
 		}
 
-		cmdPost := c.CmdPost
-		if cmdPost == "" {
-			cmdPost = cfg.Defaults.CmdPost
+		signCmdPost := c.SignCmdPost
+		if signCmdPost == "" {
+			signCmdPost = cfg.Defaults.SignCmdPost
 		}
 
-		if cmdPost != "" {
-
-			cmdPost := applyPlaceholders(cmdPost, placeholders)
+		if signCmdPost != "" {
+			cmdPost := applyPlaceholders(signCmdPost, placeholders)
 
 			//log.Printf("Running cmd_post for %s: %s", c.Name, cmdPost)
-			if err := runPostCreate(cmdPost); err != nil {
+			if err := runCommand(cmdPost); err != nil {
 				log.Fatalf("cmd_post failed for %s: %v", c.Name, err)
 			}
+		}
+	}
+
+	if cfg.Global.CmdPost != "" {
+		cmdPost := applyPlaceholders(cfg.Global.CmdPost, placeholders)
+
+		//log.Printf("Running cmd_post for %s: %s", c.Name, cmdPost)
+		if err := runCommand(cmdPost); err != nil {
+			log.Fatalf("cmd_pre failed %v", err)
 		}
 	}
 

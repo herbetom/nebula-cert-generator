@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -82,11 +83,29 @@ func applyPlaceholders(template string, values map[string]string) string {
 	return result
 }
 
+func wildcardToRegex(pattern string) string {
+	// split OR patterns
+	parts := strings.Split(pattern, "|")
+
+	for i, p := range parts {
+		p = regexp.QuoteMeta(p)                // escape regex chars
+		p = strings.ReplaceAll(p, "\\*", ".*") // convert * → .*
+		parts[i] = p
+	}
+
+	return "^(" + strings.Join(parts, "|") + ")$"
+}
+
 func main() {
 	configPath := flag.String(
 		"config",
 		"config.yml",
 		"Path to clients configuration file",
+	)
+	onNodesFlag := flag.String(
+		"on",
+		"*",
+		"Which nodes to run on. Defaults to all.",
 	)
 	flag.Parse()
 
@@ -104,6 +123,17 @@ func main() {
 
 	if len(cfg.Clients) == 0 {
 		log.Fatal("no clients defined in config")
+	}
+
+	if *onNodesFlag != "*" {
+		log.Printf("Only running for \"%s\".\n", *onNodesFlag)
+	}
+
+	regexOnPattern := wildcardToRegex(*onNodesFlag)
+	re, err := regexp.Compile(regexOnPattern)
+	if err != nil {
+		log.Fatalf("failed to compile regex -on pattern %s: %v", regexOnPattern, err)
+		return
 	}
 
 	if cfg.Defaults.Duration == "" {
@@ -144,10 +174,20 @@ func main() {
 		}
 	}
 
+	matchCounter := 0
+
 	for _, c := range cfg.Clients {
 		if c.Name == "" || len(c.Networks) <= 0 {
 			log.Fatalf("client name and ip are required: %+v", c)
 		}
+
+		if !re.MatchString(c.Name) {
+			//log.Printf("client name %s isn't matching the specified pattern.", c.Name)
+			continue
+		}
+
+		// Pattern is a match. Count so up so we know we matched something.
+		matchCounter++
 
 		placeholders := map[string]string{
 			"name": c.Name,
@@ -257,5 +297,9 @@ func main() {
 		}
 	}
 
-	fmt.Println("✔ All certificates generated successfully")
+	if matchCounter >= 1 {
+		fmt.Println("✔ All certificates generated successfully")
+	} else {
+		log.Fatalf("❌ The specified Pattern didn't match any nodes.")
+	}
 }
